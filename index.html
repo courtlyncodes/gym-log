@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gym Log</title>
+  <link rel="icon" href="/favi.png">
+  <style>
+    :root { --bg:#0b0b0c; --card:#131316; --muted:#a4a4ab; --text:#f3f3f4; --line:#26262c; --accent:#fc7dc7; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 14px; }
+    .top { display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom: 10px; }
+    .title { font-size: 18px; font-weight: 700; letter-spacing: .2px; }
+    .pill { font-size: 12px; color: var(--muted); }
+    .tabs { display:flex; gap:8px; flex-wrap:wrap; margin: 12px 0; }
+    .tab {
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 999px;
+      font-weight: 650;
+      font-size: 13px;
+    }
+    .tab.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(125,211,252,.12) inset; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; margin: 10px 0 12px; }
+    button {
+      border: 1px solid var(--line);
+      background: #0f0f12;
+      color: var(--text);
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-weight: 650;
+      font-size: 13px;
+    }
+    button.primary { border-color: rgba(125,211,252,.35); }
+    button.danger { border-color: rgba(248,113,113,.35); }
+    .hint { font-size: 12px; color: var(--muted); line-height: 1.3; }
+    .tableWrap {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+      background: #0f0f12;
+    }
+    .scrollX { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    thead th {
+      position: sticky; top: 0;
+      background: #0f0f12;
+      z-index: 3;
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      padding: 10px;
+      white-space: nowrap;
+    }
+    tbody td, tbody th {
+      border-top: 1px solid var(--line);
+      padding: 10px;
+      font-size: 14px;
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    /* Sticky first column */
+    .stickyCol {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: #0f0f12;
+      border-right: 1px solid var(--line);
+      text-align: left;
+    }
+    thead .stickyCol { z-index: 4; }
+    .sub { display:block; font-size: 12px; color: var(--muted); font-weight: 550; margin-top: 2px; }
+    .cellBtn {
+      width: 100%;
+      text-align: left;
+      padding: 10px 10px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text);
+      font-weight: 650;
+    }
+    .cellBtn.empty { color: #7b7b84; font-weight: 600; }
+    .cellBtn:active { transform: scale(.99); }
+    .cellBtn:hover { border-color: rgba(125,211,252,.20); }
+    .footer { margin-top: 10px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
+    .small { font-size: 12px; color: var(--muted); }
+
+    /* Modal */
+    .modalBackdrop {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.6);
+      display:none;
+      align-items:center; justify-content:center;
+      padding: 18px;
+      z-index: 50;
+    }
+    .modal {
+      width: min(520px, 100%);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 14px;
+      box-shadow: 0 10px 40px rgba(0,0,0,.4);
+    }
+    .modal h3 { margin: 0 0 10px; font-size: 16px; }
+    label { display:block; font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
+    input, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      background: #0f0f12;
+      color: var(--text);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+    }
+    textarea { min-height: 76px; resize: vertical; }
+    .row { display:flex; gap:10px; }
+    .row > * { flex: 1; }
+    .modalActions { display:flex; gap:8px; justify-content:flex-end; margin-top: 12px; flex-wrap:wrap; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div>
+        <div class="title">Court's Gym Log 🤏🏾</div>
+        <div class="pill">Sticky exercise column • swipe sessions left/right • tap cells to enter weight/reps</div>
+      </div>
+      <div class="pill" id="saveStatus">Saved locally ✅</div>
+    </div>
+
+    <div class="tabs" id="tabs"></div>
+
+    <div class="card">
+      <div class="actions">
+        <button class="primary" id="btnNewSession">+ New Session (adds a date column)</button>
+        <button id="btnEditExercises">Edit Exercises</button>
+        <button class="danger" id="btnDeleteLastSession">Delete Last Session</button>
+        <button id="btnExport">Export JSON</button>
+        <button id="btnReset">Reset All Data</button>
+      </div>
+
+      <div class="hint" id="hint"></div>
+
+      <div class="tableWrap">
+        <div class="scrollX">
+          <table id="grid"></table>
+        </div>
+      </div>
+
+      <div class="footer">
+        <div class="small" id="footerLeft"></div>
+        <div class="small">Tip: keep it to ~8–10 sessions visible. This app shows the latest 10 by default.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cell Modal -->
+  <div class="modalBackdrop" id="cellModalBackdrop">
+    <div class="modal">
+      <h3 id="cellModalTitle">Edit Cell</h3>
+      <div class="row">
+        <div>
+          <label>Weight</label>
+          <input id="cellWeight" placeholder="e.g., 185" inputmode="decimal" />
+        </div>
+        <div>
+          <label>Reps (optional)</label>
+          <input id="cellReps" placeholder="e.g., 5" inputmode="numeric" />
+        </div>
+      </div>
+      <label>Notes (optional)</label>
+      <textarea id="cellNotes" placeholder="e.g., felt heavy, last set grinder"></textarea>
+      <div class="modalActions">
+        <button id="cellClear">Clear</button>
+        <button id="cellCancel">Cancel</button>
+        <button class="primary" id="cellSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Exercises Modal -->
+  <div class="modalBackdrop" id="exModalBackdrop">
+    <div class="modal">
+      <h3>Edit Exercises</h3>
+      <div class="hint">Format: one per line → <b>Exercise Name | Target Reps</b> (reps can be “5”, “6-8”, “AMRAP”, etc.)</div>
+      <label>Exercises</label>
+      <textarea id="exText" spellcheck="false"></textarea>
+      <div class="modalActions">
+        <button id="exCancel">Cancel</button>
+        <button class="primary" id="exSave">Save</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  const LS_KEY = "court_gym_log_v1";
+  const MAX_SESSIONS_VISIBLE = 10;
+
+  const defaultData = {
+    activeTemplateId: "heavy_upper",
+    templates: [
+      {
+        id: "heavy_upper",
+        name: "Heavy Upper",
+        hint: "Big compounds + heavy work. Track weight (and optional reps) each session.",
+        exercises: [
+          { id:"hu1", name:"Bench Press", target:"3–5" },
+          { id:"hu2", name:"Incline DB Press", target:"6–8" },
+          { id:"hu3", name:"Barbell Row", target:"5–8" },
+          { id:"hu4", name:"Lat Pulldown / Pull-ups", target:"6–10" },
+          { id:"hu5", name:"Overhead Press", target:"5–8" },
+          { id:"hu6", name:"Cable Row", target:"8–12" },
+          { id:"hu7", name:"Lateral Raises", target:"12–20" },
+          { id:"hu8", name:"Triceps (Pushdown/Dips)", target:"8–12" },
+          { id:"hu9", name:"Biceps (Curl)", target:"8–12" },
+        ],
+        sessions: []
+      },
+      {
+        id: "heavy_lower",
+        name: "Heavy Lower",
+        hint: "Heavy hinge/squat focus. Track main lift progression and key accessories.",
+        exercises: [
+          { id:"hl1", name:"Back Squat (or Front Squat)", target:"3–5" },
+          { id:"hl2", name:"RDL (Barbell or DB)", target:"5–8" },
+          { id:"hl3", name:"Leg Press (heavy)", target:"6–10" },
+          { id:"hl4", name:"Hamstring Curl", target:"8–12" },
+          { id:"hl5", name:"Split Squat / Bulgarian", target:"6–10" },
+          { id:"hl6", name:"Calf Raises", target:"10–15" },
+          { id:"hl7", name:"Core (Hanging Raises/Plank)", target:"AMRAP / time" },
+        ],
+        sessions: []
+      },
+      {
+        id: "conditioning",
+        name: "Conditioning",
+        hint: "Conditioning is more about consistency than ego. Log time, distance, and difficulty.",
+        exercises: [
+          { id:"c1", name:"Treadmill (run/walk)", target:"mins + pace" },
+          { id:"c2", name:"Bike", target:"mins + level" },
+          { id:"c3", name:"Row", target:"mins + splits" },
+          { id:"c4", name:"Stairmaster", target:"mins + level" },
+          { id:"c5", name:"Sled Push", target:"sets + distance" },
+          { id:"c6", name:"Jump Rope", target:"mins" },
+        ],
+        sessions: []
+      },
+      {
+        id: "nonheavy_lower",
+        name: "Non-Heavy Lower",
+        hint: "Volume + control. Less load, more reps, more quality. Track weight/reps but don’t chase PRs here.",
+        exercises: [
+          { id:"nh1", name:"Goblet Squat / Hack Squat", target:"8–12" },
+          { id:"nh2", name:"Hip Thrust / Glute Bridge", target:"8–12" },
+          { id:"nh3", name:"Leg Extension", target:"12–15" },
+          { id:"nh4", name:"Hamstring Curl", target:"10–15" },
+          { id:"nh5", name:"Walking Lunge", target:"10–16 steps" },
+          { id:"nh6", name:"Cable Kickbacks / Abduction", target:"12–20" },
+          { id:"nh7", name:"Calf Raises", target:"12–20" },
+        ],
+        sessions: []
+      },
+    ]
+  };
+
+  function nowDateLabel() {
+    const d = new Date();
+    // e.g., 2025-12-15
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth()+1).padStart(2,"0");
+    const dd = String(d.getDate()).padStart(2,"0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function load() {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return structuredClone(defaultData);
+      const parsed = JSON.parse(raw);
+      // minimal safety: ensure templates exist
+      if (!parsed?.templates?.length) return structuredClone(defaultData);
+      return parsed;
+    } catch {
+      return structuredClone(defaultData);
+    }
+  }
+
+  function save() {
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+    flashSaved();
+  }
+
+  let saveTimer = null;
+  function flashSaved() {
+    const el = document.getElementById("saveStatus");
+    el.textContent = "Saved locally ✅";
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => el.textContent = "Saved locally", 900);
+  }
+
+  let state = load();
+
+  function getActiveTemplate() {
+    return state.templates.find(t => t.id === state.activeTemplateId) || state.templates[0];
+  }
+
+  // UI elements
+  const tabsEl = document.getElementById("tabs");
+  const gridEl = document.getElementById("grid");
+  const hintEl = document.getElementById("hint");
+  const footerLeftEl = document.getElementById("footerLeft");
+
+  // Modals
+  const cellBackdrop = document.getElementById("cellModalBackdrop");
+  const cellTitle = document.getElementById("cellModalTitle");
+  const cellWeight = document.getElementById("cellWeight");
+  const cellReps = document.getElementById("cellReps");
+  const cellNotes = document.getElementById("cellNotes");
+  const cellSaveBtn = document.getElementById("cellSave");
+  const cellCancelBtn = document.getElementById("cellCancel");
+  const cellClearBtn = document.getElementById("cellClear");
+
+  const exBackdrop = document.getElementById("exModalBackdrop");
+  const exText = document.getElementById("exText");
+  const exSaveBtn = document.getElementById("exSave");
+  const exCancelBtn = document.getElementById("exCancel");
+
+  let editing = null; // { templateId, sessionId, exerciseId }
+
+  function renderTabs() {
+    tabsEl.innerHTML = "";
+    for (const t of state.templates) {
+      const b = document.createElement("button");
+      b.className = "tab" + (t.id === state.activeTemplateId ? " active" : "");
+      b.textContent = t.name;
+      b.onclick = () => { state.activeTemplateId = t.id; save(); renderAll(); };
+      tabsEl.appendChild(b);
+    }
+  }
+
+  function renderGrid() {
+    const t = getActiveTemplate();
+    hintEl.textContent = t.hint;
+
+    // show latest N sessions
+    const sessions = [...t.sessions].slice(-MAX_SESSIONS_VISIBLE);
+
+    const thead = document.createElement("thead");
+    const trh = document.createElement("tr");
+
+    const th0 = document.createElement("th");
+    th0.className = "stickyCol";
+    th0.textContent = "Exercise";
+    trh.appendChild(th0);
+
+    const th1 = document.createElement("th");
+    th1.textContent = "Target";
+    trh.appendChild(th1);
+
+    for (const s of sessions) {
+      const th = document.createElement("th");
+      th.textContent = s.date;
+      trh.appendChild(th);
+    }
+    thead.appendChild(trh);
+
+    const tbody = document.createElement("tbody");
+
+    for (const ex of t.exercises) {
+      const tr = document.createElement("tr");
+
+      const exCell = document.createElement("th");
+      exCell.className = "stickyCol";
+      exCell.innerHTML = `${escapeHtml(ex.name)}<span class="sub">tap across to log</span>`;
+      tr.appendChild(exCell);
+
+      const target = document.createElement("td");
+      target.textContent = ex.target || "";
+      tr.appendChild(target);
+
+      for (const s of sessions) {
+        const td = document.createElement("td");
+        const val = s.entries?.[ex.id] || null;
+
+        const btn = document.createElement("button");
+        btn.className = "cellBtn" + (val ? "" : " empty");
+        btn.textContent = val ? formatCell(val) : "—";
+        btn.onclick = () => openCellModal(t.id, s.id, ex.id);
+        td.appendChild(btn);
+
+        tr.appendChild(td);
+      }
+
+      tbody.appendChild(tr);
+    }
+
+    gridEl.innerHTML = "";
+    gridEl.appendChild(thead);
+    gridEl.appendChild(tbody);
+
+    footerLeftEl.textContent = `${t.name}: ${t.exercises.length} exercises • showing latest ${Math.min(t.sessions.length, MAX_SESSIONS_VISIBLE)} sessions`;
+  }
+
+  function escapeHtml(str) {
+    return String(str)
+      .replaceAll("&","&amp;")
+      .replaceAll("<","&lt;")
+      .replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;")
+      .replaceAll("'","&#039;");
+  }
+
+  function formatCell(val) {
+    const w = val.weight?.trim();
+    const r = val.reps?.trim();
+    if (w && r) return `${w} x ${r}`;
+    if (w) return `${w}`;
+    if (r) return `x ${r}`;
+    return "—";
+  }
+
+  function openCellModal(templateId, sessionId, exerciseId) {
+    const t = state.templates.find(x => x.id === templateId);
+    const s = t.sessions.find(x => x.id === sessionId);
+    const ex = t.exercises.find(x => x.id === exerciseId);
+
+    editing = { templateId, sessionId, exerciseId };
+
+    const current = s.entries?.[exerciseId] || { weight:"", reps:"", notes:"" };
+    cellTitle.textContent = `${t.name} • ${ex.name} • ${s.date}`;
+    cellWeight.value = current.weight || "";
+    cellReps.value = current.reps || "";
+    cellNotes.value = current.notes || "";
+
+    cellBackdrop.style.display = "flex";
+    setTimeout(() => cellWeight.focus(), 50);
+  }
+
+  function closeCellModal() {
+    editing = null;
+    cellBackdrop.style.display = "none";
+  }
+
+  function upsertCell(value) {
+    const { templateId, sessionId, exerciseId } = editing;
+    const t = state.templates.find(x => x.id === templateId);
+    const s = t.sessions.find(x => x.id === sessionId);
+    s.entries = s.entries || {};
+    s.entries[exerciseId] = value;
+    save();
+    renderGrid();
+  }
+
+  function clearCell() {
+    const { templateId, sessionId, exerciseId } = editing;
+    const t = state.templates.find(x => x.id === templateId);
+    const s = t.sessions.find(x => x.id === sessionId);
+    if (s.entries && s.entries[exerciseId]) {
+      delete s.entries[exerciseId];
+      save();
+      renderGrid();
+    }
+  }
+
+  function addSession() {
+    const t = getActiveTemplate();
+    const date = nowDateLabel();
+    // if last session already same date, still allow but add suffix
+    const id = "s_" + Math.random().toString(36).slice(2,9);
+    t.sessions.push({ id, date, entries: {} });
+    save();
+    renderGrid();
+  }
+
+  function deleteLastSession() {
+    const t = getActiveTemplate();
+    if (!t.sessions.length) return;
+    t.sessions.pop();
+    save();
+    renderGrid();
+  }
+
+  function openExercisesModal() {
+    const t = getActiveTemplate();
+    exText.value = t.exercises.map(e => `${e.name} | ${e.target || ""}`.trim()).join("\n");
+    exBackdrop.style.display = "flex";
+    setTimeout(() => exText.focus(), 50);
+  }
+
+  function closeExercisesModal() {
+    exBackdrop.style.display = "none";
+  }
+
+  function saveExercisesFromText() {
+    const t = getActiveTemplate();
+    const lines = exText.value.split("\n").map(l => l.trim()).filter(Boolean);
+
+    const newExercises = lines.map((line, idx) => {
+      const parts = line.split("|").map(p => p.trim());
+      const name = parts[0] || `Exercise ${idx+1}`;
+      const target = parts[1] || "";
+      return { id: makeExerciseId(t.id, name, idx), name, target };
+    });
+
+    t.exercises = newExercises;
+    // keep sessions as-is; cells for removed exercise IDs just become unreachable
+    save();
+    closeExercisesModal();
+    renderGrid();
+  }
+
+  function makeExerciseId(templateId, name, idx) {
+    const base = (templateId + "_" + name).toLowerCase().replace(/[^a-z0-9]+/g,"_").slice(0,24);
+    return base + "_" + idx;
+  }
+
+  function exportJSON() {
+    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "gym-log-export.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function resetAll() {
+    if (!confirm("Reset everything? This deletes all logged data on this phone.")) return;
+    state = structuredClone(defaultData);
+    save();
+    renderAll();
+  }
+
+  function renderAll() {
+    renderTabs();
+    renderGrid();
+  }
+
+  // Wire up actions
+  document.getElementById("btnNewSession").onclick = addSession;
+  document.getElementById("btnDeleteLastSession").onclick = () => {
+    if (!confirm("Delete the most recent session column for this page?")) return;
+    deleteLastSession();
+  };
+  document.getElementById("btnEditExercises").onclick = openExercisesModal;
+  document.getElementById("btnExport").onclick = exportJSON;
+  document.getElementById("btnReset").onclick = resetAll;
+
+  cellCancelBtn.onclick = closeCellModal;
+  cellSaveBtn.onclick = () => {
+    upsertCell({
+      weight: cellWeight.value,
+      reps: cellReps.value,
+      notes: cellNotes.value
+    });
+    closeCellModal();
+  };
+  cellClearBtn.onclick = () => {
+    if (!confirm("Clear this cell?")) return;
+    clearCell();
+    closeCellModal();
+  };
+
+  cellBackdrop.addEventListener("click", (e) => {
+    if (e.target === cellBackdrop) closeCellModal();
+  });
+
+  exCancelBtn.onclick = closeExercisesModal;
+  exSaveBtn.onclick = saveExercisesFromText;
+  exBackdrop.addEventListener("click", (e) => {
+    if (e.target === exBackdrop) closeExercisesModal();
+  });
+
+  // First render
+  renderAll();
+})();
+</script>
+</body>
+</html>
